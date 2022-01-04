@@ -6,6 +6,152 @@
 #include "iup.h"
 #include "common.h"
 
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ZeroMQ glue to control clumsy from another process
+#include <errno.h>
+#include "zmq.h"
+// To build the test client, set both ZMQ_CLIENT to 1 and ZMQ_NO_FILTER to 1.
+#define ZMQ_CLIENT 1
+// For development of ZMQ-specific features, set ZMQ_NO_FILTER to 1 for both client and server. This disables clumsy filters and WinDivert operations.
+#define ZMQ_NO_FILTER 1
+
+void * zmqContext = 0;
+void * zmqSocket = 0;
+
+static void zmqCleanup(void)
+{   // Clean up ZeroMQ socket and context
+    LOG("zmqCleanup:\n");
+    zmq_close(zmqSocket);
+    zmq_ctx_destroy(zmqContext);
+}
+
+static int zmqConnect(void)
+{   // Create a connection to a ZeroMQ service. (For testing only.)
+    LOG("zmqConnect: ");
+    // Create socket to talk to server
+    zmqSocket = zmq_socket(zmqContext, ZMQ_REQ);
+    int rc = zmq_connect(zmqSocket, "tcp://localhost:5555");
+    LOG("zmq_connect=%i\n", rc);
+    return rc;
+}
+
+static int zmqListen(void)
+{   // Listen on a socket for an incoming connection from a ZeroMQ client.
+    LOG("zmqListen: ");
+    // Create socket to talk to clients
+    zmqSocket = zmq_socket(zmqContext, ZMQ_REP);
+    int rc = zmq_bind(zmqSocket, "tcp://*:5555");
+    LOG("zmq_bind=%i\n", rc);
+    return rc;
+}
+
+static void zmqSetup(void)
+{   // Create a ZeroMQ context and socket.
+    LOG("zmqSetup:\n");
+    zmqContext = zmq_ctx_new();
+#if ZMQ_CLIENT
+    int rc = zmqConnect();
+#else
+    int rc = zmqListen();
+#endif
+    if (rc != 0)
+    {   // zmq_connect or zmq_bind failed so clean up ZMQ socket and context
+        zmqCleanup();
+    }
+    assert(rc == 0);
+}
+
+static int zmqClientUpdate(Ihandle* ih)
+{   // Send messages as a ZeroMQ client (for testing only).
+    UNREFERENCED_PARAMETER(ih);
+    {
+        static int counter = 0; ++counter;
+        LOG("zmqClientUpdate: %i\n", counter);
+        char sendMsg[256];
+        sprintf(sendMsg, "SetLagTo %i", counter % 200);
+        int numBytesSent = zmq_send(zmqSocket, sendMsg, strlen(sendMsg), 0);
+        char statusString[256];
+        if (numBytesSent >= 0)
+        {
+            sprintf(statusString, "zmqClientUpdate: (tick %i) sent=%i", counter, numBytesSent);
+            {
+                char receivedMessage[257];
+                int numBytesRcvd = zmq_recv(zmqSocket, receivedMessage, sizeof(receivedMessage)-1, 0);
+                receivedMessage[numBytesRcvd] = '\0';
+                LOG("zmqClientUpdate: rcvd '%s'\n", receivedMessage);
+                sprintf(statusString, "zmqClientUpdate: (tick %i) numBytesSent=%i rcvd '%s'", counter, numBytesSent, receivedMessage);
+            }
+        }
+        else if(EFSM == errno)
+        {
+            sprintf(statusString, "zmqClientUpdate: (tick %i) numBytesSent=%i errno=EFSM", counter, numBytesSent);
+        }
+        else
+        {
+            sprintf(statusString, "zmqClientUpdate: (tick %i) numBytesSent=%i errno=%i", counter, numBytesSent, errno);
+        }
+        showStatus(statusString);
+    }
+    return IUP_DEFAULT;
+}
+
+extern Ihandle* timeInput, * variationInput;
+extern volatile short lagTime;
+
+static int zmqServerUpdate(Ihandle* ih)
+{   // Handle incoming ZeroMQ messages
+    UNREFERENCED_PARAMETER(ih);
+    static int counter = 0; ++counter;
+    LOG("zmqServerUpdate: %i\n", counter);
+    char receivedMessage[256];
+    int numBytesRcvd = zmq_recv(zmqSocket, receivedMessage, sizeof(receivedMessage)-1, ZMQ_DONTWAIT);
+    char statusString[256];
+    if (numBytesRcvd >= 0)
+    {   // ZMQ received a message.
+        receivedMessage[numBytesRcvd] = '\0'; // nul-termimate receivedMessage
+        sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK", counter, receivedMessage);
+        zmq_send(zmqSocket, "ACK", 3, 0); // Note that this blocks. If server dies, this thread freezes forever.
+        int lagInMilliseconds = -1;
+        int numArgsScanned = sscanf(receivedMessage, "SetLagTo %i", &lagInMilliseconds);
+        if(1 == numArgsScanned)
+        {   // Scanned "SetLagTo" request
+            sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed SetLagTo=%i", counter, receivedMessage, lagInMilliseconds);
+            IupSetInt(timeInput, "VALUE", lagInMilliseconds);
+            lagTime = (short)lagInMilliseconds;
+        }
+    }
+    else if (EAGAIN == errno)
+    {   // ZMQ received nothing.
+        sprintf(statusString, "zmqServerUpdate: (tick %i) numBytesRcvd=%i errno=EAGAIN", counter, numBytesRcvd);
+    }
+    else if(EFSM == errno)
+    {
+        sprintf(statusString, "zmqServerUpdate: (tick %i) numBytesRcvd=%i ERROR errno=EFSM", counter, numBytesRcvd);
+    }
+    else
+    {
+        sprintf(statusString, "zmqServerUpdate: (tick %i) numBytesRcvd=%i ERROR errno=%i", counter, numBytesRcvd, errno);
+    }
+    showStatus(statusString);
+    return IUP_DEFAULT;
+}
+
+static int zmqUpdate(Ihandle* ih)
+{   // Perform per-tick update of ZeroMQ message handlers
+#if ZMQ_CLIENT
+    return zmqClientUpdate(ih);
+#else
+    return zmqServerUpdate(ih);
+#endif
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
 // ! the order decides which module get processed first
 Module* modules[MODULE_CNT] = {
     &lagModule,
@@ -230,7 +376,7 @@ void init(int argc, char* argv[]) {
         )
     );
 
-    IupSetAttribute(dialog, "TITLE", "clumsy " CLUMSY_VERSION "MJG");
+    IupSetAttribute(dialog, "TITLE", "clumsy " CLUMSY_VERSION "_MichaGou_varLag_zmq");
     IupSetAttribute(dialog, "SIZE", "480x"); // add padding manually to width
     IupSetAttribute(dialog, "RESIZE", "NO");
     IupSetCallback(dialog, "SHOW_CB", (Icallback)uiOnDialogShow);
@@ -263,6 +409,8 @@ void init(int argc, char* argv[]) {
 void startup() {
     // initialize seed
     srand((unsigned int)time(NULL));
+
+    zmqSetup();
 
     // kickoff event loops
     IupShowXY(dialog, IUP_CENTER, IUP_CENTER);
@@ -319,7 +467,6 @@ static BOOL checkIsRunning() {
 static int uiOnDialogShow(Ihandle *ih, int state) {
     // only need to process on show
     HWND hWnd;
-    BOOL exit;
     HICON icon;
     HINSTANCE hInstance;
     if (state != IUP_SHOW) return IUP_DEFAULT;
@@ -331,6 +478,11 @@ static int uiOnDialogShow(Ihandle *ih, int state) {
     SendMessage(hWnd, WM_SETICON, ICON_BIG, (LPARAM)icon);
     SendMessage(hWnd, WM_SETICON, ICON_SMALL, (LPARAM)icon);
 
+#if ZMQ_NO_FILTER // for development, do not run elevated, so that original process can be debugged
+    return IUP_DEFAULT;
+#else
+
+    BOOL exit;
     exit = checkIsRunning();
     if (exit) {
         MessageBox(hWnd, (LPCSTR)"Theres' already an instance of clumsy running.",
@@ -353,17 +505,23 @@ static int uiOnDialogShow(Ihandle *ih, int state) {
         LOG("is parameterized, start filtering upon execution.");
         uiStartCb(filterButton);
     }
-
+    else if(exit)
+    {   // tryElevate wants to terminate the original process, so clean up ZMQ first so replacement process can bind the socket.
+        zmqCleanup();
+    }
     return exit ? IUP_CLOSE : IUP_DEFAULT;
+#endif
 }
 
 static int uiStartCb(Ihandle *ih) {
-    char buf[MSG_BUFSIZE];
     UNREFERENCED_PARAMETER(ih);
+#if ! ZMQ_NO_FILTER // Run WinDivert in regular builds (not ZMQ-specific development builds)
+    char buf[MSG_BUFSIZE];
     if (divertStart(IupGetAttribute(filterText, "VALUE"), buf) == 0) {
         showStatus(buf);
         return IUP_DEFAULT;
     }
+#endif
 
     // successfully started
     showStatus("Started filtering. Enable functionalities to take effect.");
@@ -420,6 +578,8 @@ static int uiToggleControls(Ihandle *ih, int state) {
 static int uiTimerCb(Ihandle *ih) {
     int ix;
     UNREFERENCED_PARAMETER(ih);
+    zmqUpdate(ih);
+
     for (ix = 0; ix < MODULE_CNT; ++ix) {
         if (modules[ix]->processTriggered) {
             IupSetAttribute(modules[ix]->iconHandle, "IMAGE", "doing_icon");
