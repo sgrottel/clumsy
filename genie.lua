@@ -25,6 +25,7 @@ local LIB_IUP_WIN32_VC11 = 'external/iup-3.30_Win32_dll16_lib'
 local LIB_IUP_WIN64_VC11 = 'external/iup-3.30_Win64_dll16_lib'
 local LIB_IUP_WIN32_MINGW = 'external/iup-3.30_Win32_mingw6_lib'
 local LIB_IUP_WIN64_MINGW = 'external/iup-3.30_Win64_mingw6_lib'
+local LIB_ZMQ = 'external/libzmq'
 
 local ROOT = os.getcwd()
 print(ROOT)
@@ -37,7 +38,7 @@ solution('clumsy')
     project('clumsy')
         language("C")
         files({'src/**.c', 'src/**.h'})
-        links({'WinDivert', 'iup', 'comctl32', 'Winmm', 'ws2_32'}) 
+        links({'WinDivert', 'iup', 'libzmq-v142-mt-4_3_5', 'comctl32', 'Winmm', 'ws2_32'}) 
         if string.match(_ACTION, '^vs') then -- only vs can include rc file in solution
             files({'./etc/clumsy.rc'})
         elseif _ACTION == MINGW_ACTION then
@@ -81,7 +82,8 @@ solution('clumsy')
             includedirs({LIB_IUP_WIN32_VC11 .. '/include'})
             libdirs({
                 LIB_DIVERT_VC11 .. '/x86',
-                LIB_IUP_WIN32_VC11 .. ''
+                LIB_IUP_WIN32_VC11 .. '',
+				LIB_ZMQ .. '/lib'
                 })
 
         configuration({'x64', 'vs*'})
@@ -89,26 +91,31 @@ solution('clumsy')
             includedirs({LIB_IUP_WIN64_VC11 .. '/include'})
             libdirs({
                 LIB_DIVERT_VC11 .. '/x64',
-                LIB_IUP_WIN64_VC11 .. ''
+                LIB_IUP_WIN64_VC11 .. '',
+				LIB_ZMQ .. '/lib'
                 })
 
         configuration({'x32', MINGW_ACTION})
             defines({'X32'}) -- defines would be passed to resource compiler for whatever reason
             includedirs({LIB_DIVERT_MINGW .. '/include',
-                LIB_IUP_WIN32_MINGW .. '/include'})
+                LIB_IUP_WIN32_MINGW .. '/include',
+				LIB_ZMQ .. '/include'})
             libdirs({
                 LIB_DIVERT_MINGW .. '/x86',
-                LIB_IUP_WIN32_MINGW .. ''
+                LIB_IUP_WIN32_MINGW .. '',
+				LIB_ZMQ .. '/lib'
                 })
             resoptions({'-O coff', '-F pe-i386'}) -- mingw64 defaults to x64
 
         configuration({'x64', MINGW_ACTION})
             defines({'X64'})
             includedirs({LIB_DIVERT_MINGW .. '/include',
-                LIB_IUP_WIN64_MINGW .. '/include'})
+                LIB_IUP_WIN64_MINGW .. '/include',
+				LIB_ZMQ .. '/include'})
             libdirs({
                 LIB_DIVERT_MINGW .. '/x64',
-                LIB_IUP_WIN64_MINGW .. ''
+                LIB_IUP_WIN64_MINGW .. '',
+				LIB_ZMQ .. '/lib'
                 })
 
         local function set_bin(platform, config, arch)
@@ -119,22 +126,26 @@ solution('clumsy')
                 platform_str = platform
             end
             local subdir = ROOT .. '/bin/' .. platform_str .. '/' .. config .. '/' .. arch
-            local divert_lib, iup_lib
+            local divert_lib, iup_lib, zmq_lib
             if platform == 'vs*' then 
                 if arch == 'x64' then
                     divert_lib = ROOT .. '/' .. LIB_DIVERT_VC11  .. '/x64/'
                     iup_lib = ROOT .. '/' .. LIB_IUP_WIN64_VC11 .. ''
+                    zmq_lib = ROOT .. '/' .. LIB_ZMQ .. '/lib'
                 else
                     divert_lib = ROOT ..'/' .. LIB_DIVERT_VC11 .. '/x86/'
                     iup_lib = ROOT ..'/' .. LIB_IUP_WIN32_VC11 .. ''
+                    zmq_lib = ROOT .. '/' .. LIB_ZMQ .. '/lib'
                 end
             elseif platform == MINGW_ACTION then
                 if arch == 'x64' then
                     divert_lib = ROOT .. '/' .. LIB_DIVERT_MINGW .. '/x64/'
                     iup_lib = ROOT .. '/' .. LIB_IUP_WIN64_MINGW .. ''
+                    zmq_lib = ROOT .. '/' .. LIB_ZMQ .. '/lib'
                 else
                     divert_lib = ROOT .. '/' .. LIB_DIVERT_MINGW .. '/x86/'
                     iup_lib = ROOT .. '/' .. LIB_IUP_WIN32_MINGW .. ''
+                    zmq_lib = ROOT .. '/' .. LIB_ZMQ .. '/lib'
                 end
             end
             configuration({platform, config, arch})
@@ -144,6 +155,7 @@ solution('clumsy')
                     postbuildcommands({
                         "robocopy " .. divert_lib .." " .. subdir .. '  *.dll *.sys >> robolog.txt',
                         "robocopy " .. iup_lib .. " "  .. subdir .. ' iup.dll >> robolog.txt',
+                        "robocopy " .. zmq_lib .. " "  .. subdir .. ' libzmq-*.dll >> robolog.txt',
                         "robocopy " .. ROOT .. "/etc/ "   .. subdir .. ' config.txt >> robolog.txt',
                         "exit /B 0"
                     })
@@ -151,6 +163,7 @@ solution('clumsy')
                     postbuildcommands({
                         -- robocopy returns non 0 will fail make
                         'cp ' .. divert_lib .. "WinDivert* " .. subdir,
+                        'cp ' .. zmq_lib .. "/libzmq* " .. subdir,
                         'cp ' .. ROOT .. "/etc/config.txt " .. subdir,
                     })
                 end

@@ -14,9 +14,9 @@
 #include <errno.h>
 #include "zmq.h"
 // To build the test client, set both ZMQ_CLIENT to 1 and ZMQ_NO_FILTER to 1.
-#define ZMQ_CLIENT 1
+#define ZMQ_CLIENT 0
 // For development of ZMQ-specific features, set ZMQ_NO_FILTER to 1 for both client and server. This disables clumsy filters and WinDivert operations.
-#define ZMQ_NO_FILTER 1
+#define ZMQ_NO_FILTER 0
 
 void * zmqContext = 0;
 void * zmqSocket = 0;
