@@ -69,7 +69,7 @@ static int zmqClientUpdate(Ihandle* ih)
     UNREFERENCED_PARAMETER(ih);
     {
         static int counter = 0; ++counter;
-        LOG("zmqClientUpdate: %i\n", counter);
+        //LOG("zmqClientUpdate: %i\n", counter);
         char sendMsg[256];
         static int roundRobin = 0; roundRobin = (roundRobin + 1) % 3;
         switch (roundRobin)
@@ -86,7 +86,7 @@ static int zmqClientUpdate(Ihandle* ih)
             char receivedMessage[257];
             int numBytesRcvd = zmq_recv(zmqSocket, receivedMessage, sizeof(receivedMessage)-1, 0);
             receivedMessage[numBytesRcvd] = '\0';
-            LOG("zmqClientUpdate: (tick %i) sent=%i rcvd='%s'\n", counter, numBytesSent, receivedMessage);
+            //LOG("zmqClientUpdate: (tick %i) sent=%i rcvd='%s'\n", counter, numBytesSent, receivedMessage);
             sprintf(statusString, "zmqClientUpdate: (tick %i) sendMsg='%s' numBytesSent=%i rcvdMsg='%s'", counter, sendMsg, numBytesSent, receivedMessage);
         }
         else if(EFSM == errno)
@@ -110,7 +110,7 @@ static int zmqServerUpdate(Ihandle* ih)
 {   // Handle incoming ZeroMQ messages
     UNREFERENCED_PARAMETER(ih);
     static int counter = 0; ++counter;
-    LOG("zmqServerUpdate: %i\n", counter);
+    //LOG("zmqServerUpdate: %i\n", counter);
     char receivedMessage[256];
     int numBytesRcvd = zmq_recv(zmqSocket, receivedMessage, sizeof(receivedMessage)-1, ZMQ_DONTWAIT);
     char statusString[256];
