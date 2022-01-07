@@ -73,6 +73,7 @@ solution('clumsy')
 			linkoptions({'/ENTRY:"mainCRTStartup" /SAFESEH:NO'})
 			-- characterset("MBCS")
             includedirs({LIB_DIVERT_VC11 .. '/include'})
+            includedirs({LIB_ZMQ .. '/include'})
             objdir('obj_vs')
 
         configuration({'x32', 'vs*'})
