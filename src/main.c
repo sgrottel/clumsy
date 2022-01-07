@@ -70,13 +70,13 @@ static int zmqClientUpdate(Ihandle* ih)
     {
         static int counter = 0; ++counter;
         //LOG("zmqClientUpdate: %i\n", counter);
-        char sendMsg[256];
+        char sendMsg[256] = "";
         static int roundRobin = 0; roundRobin = (roundRobin + 1) % 3;
         switch (roundRobin)
         {
-        case 0: sprintf(sendMsg, "LagDelayMs %i", counter % 500); break;
-        case 1: sprintf(sendMsg, "DropChancePct %i", counter % 100); break;
-        case 2: sprintf(sendMsg, "BandwidthLimitKBps %i", counter % 10000); break;
+        case 0: snprintf(sendMsg, sizeof(sendMsg), "LagDelayMs %i", counter % 500); break;
+        case 1: snprintf(sendMsg, sizeof(sendMsg), "DropChancePct %i", counter % 100); break;
+        case 2: snprintf(sendMsg, sizeof(sendMsg), "BandwidthLimitKBps %i", counter % 10000); break;
         }
 
         int numBytesSent = zmq_send(zmqSocket, sendMsg, strlen(sendMsg), 0);
