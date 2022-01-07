@@ -71,19 +71,23 @@ static int zmqClientUpdate(Ihandle* ih)
         static int counter = 0; ++counter;
         LOG("zmqClientUpdate: %i\n", counter);
         char sendMsg[256];
-        sprintf(sendMsg, "SetLagTo %i", counter % 200);
+        static int roundRobin = 0; roundRobin = (roundRobin + 1) % 3;
+        switch (roundRobin)
+        {
+        case 0: sprintf(sendMsg, "LagDelayMs %i", counter % 500); break;
+        case 1: sprintf(sendMsg, "DropChancePct %i", counter % 100); break;
+        case 2: sprintf(sendMsg, "BandwidthLimitKBps %i", counter % 10000); break;
+        }
+
         int numBytesSent = zmq_send(zmqSocket, sendMsg, strlen(sendMsg), 0);
         char statusString[256];
         if (numBytesSent >= 0)
         {
-            sprintf(statusString, "zmqClientUpdate: (tick %i) sent=%i", counter, numBytesSent);
-            {
-                char receivedMessage[257];
-                int numBytesRcvd = zmq_recv(zmqSocket, receivedMessage, sizeof(receivedMessage)-1, 0);
-                receivedMessage[numBytesRcvd] = '\0';
-                LOG("zmqClientUpdate: rcvd '%s'\n", receivedMessage);
-                sprintf(statusString, "zmqClientUpdate: (tick %i) numBytesSent=%i rcvd '%s'", counter, numBytesSent, receivedMessage);
-            }
+            char receivedMessage[257];
+            int numBytesRcvd = zmq_recv(zmqSocket, receivedMessage, sizeof(receivedMessage)-1, 0);
+            receivedMessage[numBytesRcvd] = '\0';
+            LOG("zmqClientUpdate: (tick %i) sent=%i rcvd='%s'\n", counter, numBytesSent, receivedMessage);
+            sprintf(statusString, "zmqClientUpdate: (tick %i) sendMsg='%s' numBytesSent=%i rcvdMsg='%s'", counter, sendMsg, numBytesSent, receivedMessage);
         }
         else if(EFSM == errno)
         {
@@ -99,7 +103,8 @@ static int zmqClientUpdate(Ihandle* ih)
 }
 
 extern Ihandle* timeInput, * variationInput;
-extern volatile short lagTime;
+extern Ihandle* inboundCheckbox, * outboundCheckbox, * chanceInput;
+extern Ihandle* inboundCheckbox, * outboundCheckbox, * bandwidthInput;
 
 static int zmqServerUpdate(Ihandle* ih)
 {   // Handle incoming ZeroMQ messages
@@ -114,13 +119,22 @@ static int zmqServerUpdate(Ihandle* ih)
         receivedMessage[numBytesRcvd] = '\0'; // nul-termimate receivedMessage
         sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK", counter, receivedMessage);
         zmq_send(zmqSocket, "ACK", 3, 0); // Note that this blocks. If server dies, this thread freezes forever.
-        int lagInMilliseconds = -1;
-        int numArgsScanned = sscanf(receivedMessage, "SetLagTo %i", &lagInMilliseconds);
-        if(1 == numArgsScanned)
-        {   // Scanned "SetLagTo" request
-            sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed SetLagTo=%i", counter, receivedMessage, lagInMilliseconds);
-            IupSetInt(timeInput, "VALUE", lagInMilliseconds);
-            lagTime = (short)lagInMilliseconds;
+        int intParam = -1;
+        float fltParam = -1.0f;
+        if (1 == sscanf(receivedMessage, "LagDelayMs %i", &intParam))
+        {   // Scanned "LagDelayMs" request
+            sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed LagDelayMs=%i", counter, receivedMessage, intParam);
+            IupSetInt(timeInput, "VALUE", intParam);
+        }
+        else if (1 == sscanf(receivedMessage, "DropChancePct %f", &fltParam))
+        {   // Scanned "DropChancePct" request
+            sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed DropChancePct=%f", counter, receivedMessage, fltParam);
+            IupSetFloat(chanceInput, "VALUE", fltParam);
+        }
+        else if (1 == sscanf(receivedMessage, "BandwidthLimitKBps %i", &intParam))
+        {   // Scanned "BandwidthLimitKBps" request
+            sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed BandwidthLimitKBps=%i", counter, receivedMessage, intParam);
+            IupSetInt(bandwidthInput, "VALUE", intParam);
         }
     }
     else if (EAGAIN == errno)

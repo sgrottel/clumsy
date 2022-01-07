@@ -5,7 +5,7 @@
 #include "common.h"
 #define NAME "drop"
 
-static Ihandle *inboundCheckbox, *outboundCheckbox, *chanceInput;
+Ihandle *inboundCheckbox, *outboundCheckbox, *chanceInput;
 
 static volatile short dropEnabled = 0,
     dropInbound = 1, dropOutbound = 1,

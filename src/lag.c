@@ -13,14 +13,12 @@
 #define VARIATION_DEFAULT 0
 
 // don't need a chance
-static Ihandle* inboundCheckbox, * outboundCheckbox;
-Ihandle * timeInput, * variationInput;
+Ihandle* inboundCheckbox, * outboundCheckbox, * timeInput, * variationInput;
 
 static volatile short lagEnabled = 0,
     lagInbound = 1,
-    lagOutbound = 1;
-
-volatile short lagTime = LAG_DEFAULT, // default for 50ms
+    lagOutbound = 1,
+    lagTime = LAG_DEFAULT, // default for 50ms
     lagVariation = VARIATION_DEFAULT; // default for no variation
 
 static PacketNode lagHeadNode = {0}, lagTailNode = {0};
