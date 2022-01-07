@@ -103,8 +103,8 @@ static int zmqClientUpdate(Ihandle* ih)
 }
 
 extern Ihandle* timeInput, * variationInput;
-extern Ihandle* inboundCheckbox, * outboundCheckbox, * chanceInput;
-extern Ihandle* inboundCheckbox, * outboundCheckbox, * bandwidthInput;
+extern Ihandle* chanceInput;
+extern Ihandle* bandwidthInput;
 
 static int zmqServerUpdate(Ihandle* ih)
 {   // Handle incoming ZeroMQ messages

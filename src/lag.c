@@ -13,7 +13,8 @@
 #define VARIATION_DEFAULT 0
 
 // don't need a chance
-Ihandle* inboundCheckbox, * outboundCheckbox, * timeInput, * variationInput;
+static Ihandle* inboundCheckbox, * outboundCheckbox;
+Ihandle * timeInput, * variationInput;
 
 static volatile short lagEnabled = 0,
     lagInbound = 1,
