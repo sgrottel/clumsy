@@ -71,12 +71,13 @@ static int zmqClientUpdate(Ihandle* ih)
         static int counter = 0; ++counter;
         //LOG("zmqClientUpdate: %i\n", counter);
         char sendMsg[256] = "";
-        static int roundRobin = 0; roundRobin = (roundRobin + 1) % 3;
+        static int roundRobin = 0; roundRobin = (roundRobin + 1) % /* number of cases below*/ 3;
         switch (roundRobin)
         {
         case 0: snprintf(sendMsg, sizeof(sendMsg), "LagDelayMs %i", counter % 500); break;
         case 1: snprintf(sendMsg, sizeof(sendMsg), "DropChancePct %i", counter % 100); break;
         case 2: snprintf(sendMsg, sizeof(sendMsg), "BandwidthLimitKBps %i", counter % 10000); break;
+        default: snprintf(sendMsg, sizeof(sendMsg), "THIS_SHOULD_NEVER_HAPPEN %i", counter); break;
         }
 
         int numBytesSent = zmq_send(zmqSocket, sendMsg, strlen(sendMsg), 0);
@@ -114,41 +115,50 @@ static int zmqServerUpdate(Ihandle* ih)
     char receivedMessage[256];
     int numBytesRcvd = zmq_recv(zmqSocket, receivedMessage, sizeof(receivedMessage)-1, ZMQ_DONTWAIT);
     char statusString[256];
-    if (numBytesRcvd >= 0)
-    {   // ZMQ received a message.
-        receivedMessage[numBytesRcvd] = '\0'; // nul-termimate receivedMessage
-        sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK", counter, receivedMessage);
-        zmq_send(zmqSocket, "ACK", 3, 0); // Note that this blocks. If server dies, this thread freezes forever.
-        int intParam = -1;
-        float fltParam = -1.0f;
-        if (1 == sscanf(receivedMessage, "LagDelayMs %i", &intParam))
-        {   // Scanned "LagDelayMs" request
-            sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed LagDelayMs=%i", counter, receivedMessage, intParam);
-            IupSetInt(timeInput, "VALUE", intParam);
-        }
-        else if (1 == sscanf(receivedMessage, "DropChancePct %f", &fltParam))
-        {   // Scanned "DropChancePct" request
-            sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed DropChancePct=%f", counter, receivedMessage, fltParam);
-            IupSetFloat(chanceInput, "VALUE", fltParam);
-        }
-        else if (1 == sscanf(receivedMessage, "BandwidthLimitKBps %i", &intParam))
-        {   // Scanned "BandwidthLimitKBps" request
-            sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed BandwidthLimitKBps=%i", counter, receivedMessage, intParam);
-            IupSetInt(bandwidthInput, "VALUE", intParam);
-        }
-    }
-    else if (EAGAIN == errno)
-    {   // ZMQ received nothing.
-        sprintf(statusString, "zmqServerUpdate: (tick %i) numBytesRcvd=%i errno=EAGAIN", counter, numBytesRcvd);
-    }
-    else if(EFSM == errno)
+    do
     {
-        sprintf(statusString, "zmqServerUpdate: (tick %i) numBytesRcvd=%i ERROR errno=EFSM", counter, numBytesRcvd);
-    }
-    else
-    {
-        sprintf(statusString, "zmqServerUpdate: (tick %i) numBytesRcvd=%i ERROR errno=%i", counter, numBytesRcvd, errno);
-    }
+        if (numBytesRcvd >= 0)
+        {   // ZMQ received a message.
+            receivedMessage[numBytesRcvd] = '\0'; // nul-termimate receivedMessage
+            sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK", counter, receivedMessage);
+            zmq_send(zmqSocket, "ACK", 3, 0);
+            int intParam = -1;
+            float fltParam = -1.0f;
+            if (1 == sscanf(receivedMessage, "LagDelayMs %i", &intParam))
+            {   // Scanned "LagDelayMs" request
+                sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed LagDelayMs=%i", counter, receivedMessage, intParam);
+                IupSetInt(timeInput, "VALUE", intParam);
+            }
+            else if (1 == sscanf(receivedMessage, "DropChancePct %f", &fltParam))
+            {   // Scanned "DropChancePct" request
+                sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed DropChancePct=%f", counter, receivedMessage, fltParam);
+                IupSetFloat(chanceInput, "VALUE", fltParam);
+            }
+            else if (1 == sscanf(receivedMessage, "BandwidthLimitKBps %i", &intParam))
+            {   // Scanned "BandwidthLimitKBps" request
+                sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed BandwidthLimitKBps=%i", counter, receivedMessage, intParam);
+                IupSetInt(bandwidthInput, "VALUE", intParam);
+            }
+            // See if ZMQ has another message to process right away.
+            // Note that if only 1 client is connected,
+            // because of how ZeroMQ does send/recv in pairs when in REQ-REP mode,
+            // the presence now of another message implies the client got the ACK and responded very fast
+            // -- not that the client queued up multiple messages before the zmq_recv above.
+            numBytesRcvd = zmq_recv(zmqSocket, receivedMessage, sizeof(receivedMessage) - 1, ZMQ_DONTWAIT);
+        }
+        else if (EAGAIN == errno)
+        {   // ZMQ received nothing.
+            sprintf(statusString, "zmqServerUpdate: (tick %i) numBytesRcvd=%i errno=EAGAIN", counter, numBytesRcvd);
+        }
+        else if (EFSM == errno)
+        {
+            sprintf(statusString, "zmqServerUpdate: (tick %i) numBytesRcvd=%i ERROR errno=EFSM", counter, numBytesRcvd);
+        }
+        else
+        {
+            sprintf(statusString, "zmqServerUpdate: (tick %i) numBytesRcvd=%i ERROR errno=%i", counter, numBytesRcvd, errno);
+        }
+    } while (numBytesRcvd > 0);
     showStatus(statusString);
     return IUP_DEFAULT;
 }
