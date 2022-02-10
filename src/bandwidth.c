@@ -5,6 +5,7 @@
 
 #include "iup.h"
 #include "common.h"
+#include "rateStats.h"
 
 #define NAME "bandwidth"
 #define BANDWIDTH_MIN  "0"
@@ -14,30 +15,30 @@
 //---------------------------------------------------------------------
 // rate stats
 //---------------------------------------------------------------------
-typedef struct {
-	int32_t initialized;
-	uint32_t oldest_index;
-	uint32_t oldest_ts;
-	int64_t accumulated_count;
-	int32_t sample_num;
-	int window_size;
-	float scale;
-	uint32_t *array_sum;
-	uint32_t *array_sample;
-} CRateStats;
-
-
-CRateStats* crate_stats_new(int window_size, float scale);
-
-void crate_stats_delete(CRateStats *rate);
-
-void crate_stats_reset(CRateStats *rate);
-
-// call when packet arrives, count is the packet size in bytes
-void crate_stats_update(CRateStats *rate, int32_t count, uint32_t now_ts);
-
-// calculate rate
-int32_t crate_stats_calculate(CRateStats *rate, uint32_t now_ts);
+//typedef struct {
+//	int32_t initialized;
+//	uint32_t oldest_index;
+//	uint32_t oldest_ts;
+//	int64_t accumulated_count;
+//	int32_t sample_num;
+//	int window_size;
+//	float scale;
+//	uint32_t *array_sum;
+//	uint32_t *array_sample;
+//} CRateStats;
+//
+//
+//CRateStats* crate_stats_new(int window_size, float scale);
+//
+//void crate_stats_delete(CRateStats *rate);
+//
+//void crate_stats_reset(CRateStats *rate);
+//
+//// call when packet arrives, count is the packet size in bytes
+//void crate_stats_update(CRateStats *rate, int32_t count, uint32_t now_ts);
+//
+//// calculate rate
+//int32_t crate_stats_calculate(CRateStats *rate, uint32_t now_ts);
 
 
 //---------------------------------------------------------------------

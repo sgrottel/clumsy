@@ -71,21 +71,21 @@ static int zmqClientUpdate(Ihandle* ih)
         static int counter = 0; ++counter;
         //LOG("zmqClientUpdate: %i\n", counter);
         char sendMsg[256] = "";
-        static int roundRobin = 0; roundRobin = (roundRobin + 1) % /* number of cases below*/ 3;
+        static int roundRobin = 0; roundRobin = (roundRobin + 1) % /* number of cases below*/ 4;
         switch (roundRobin)
         {
         case 0: snprintf(sendMsg, sizeof(sendMsg), "LagDelayMs %i", counter % 500); break;
         case 1: snprintf(sendMsg, sizeof(sendMsg), "DropChancePct %i", counter % 100); break;
         case 2: snprintf(sendMsg, sizeof(sendMsg), "BandwidthLimitKBps %i", counter % 10000); break;
+        case 4: snprintf(sendMsg, sizeof(sendMsg), "RateLimitKbps %i", counter % 10000); break;
         default: snprintf(sendMsg, sizeof(sendMsg), "THIS_SHOULD_NEVER_HAPPEN %i", counter); break;
         }
-
         int numBytesSent = zmq_send(zmqSocket, sendMsg, strlen(sendMsg), 0);
         char statusString[256];
         if (numBytesSent >= 0)
         {
             char receivedMessage[257];
-            int numBytesRcvd = zmq_recv(zmqSocket, receivedMessage, sizeof(receivedMessage)-1, 0);
+            int numBytesRcvd = zmq_recv(zmqSocket, receivedMessage, sizeof(receivedMessage) - 1, 0);
             receivedMessage[numBytesRcvd] = '\0';
             //LOG("zmqClientUpdate: (tick %i) sent=%i rcvd='%s'\n", counter, numBytesSent, receivedMessage);
             sprintf(statusString, "zmqClientUpdate: (tick %i) sendMsg='%s' numBytesSent=%i rcvdMsg='%s'", counter, sendMsg, numBytesSent, receivedMessage);
@@ -106,12 +106,14 @@ static int zmqClientUpdate(Ihandle* ih)
 extern Ihandle* timeInput, * variationInput;
 extern Ihandle* chanceInput;
 extern Ihandle* bandwidthInput;
+extern Ihandle* rlDataRateCapMbps;
+extern float rateLimit_dataRateBytesPerSec;
 
 static int zmqServerUpdate(Ihandle* ih)
 {   // Handle incoming ZeroMQ messages
     UNREFERENCED_PARAMETER(ih);
     static int counter = 0; ++counter;
-    //LOG("zmqServerUpdate: %i\n", counter);
+    //LOG("zmqServerUpdate: %i", counter);
     char receivedMessage[256];
     int numBytesRcvd = zmq_recv(zmqSocket, receivedMessage, sizeof(receivedMessage)-1, ZMQ_DONTWAIT);
     char statusString[256];
@@ -139,6 +141,11 @@ static int zmqServerUpdate(Ihandle* ih)
                 sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed BandwidthLimitKBps=%i", counter, receivedMessage, intParam);
                 IupSetInt(bandwidthInput, "VALUE", intParam);
             }
+            else if (1 == sscanf(receivedMessage, "RateLimitKbps %i", &intParam))
+            {   // Scanned "RateLimitKbps" request
+                sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed RateLimitKbps=%i", counter, receivedMessage, intParam);
+                IupSetInt(rlDataRateCapMbps, "VALUE", intParam);
+            }
             // See if ZMQ has another message to process right away.
             // Note that if only 1 client is connected,
             // because of how ZeroMQ does send/recv in pairs when in REQ-REP mode,
@@ -159,7 +166,7 @@ static int zmqServerUpdate(Ihandle* ih)
             sprintf(statusString, "zmqServerUpdate: (tick %i) numBytesRcvd=%i ERROR errno=%i", counter, numBytesRcvd, errno);
         }
     } while (numBytesRcvd > 0);
-    showStatus(statusString);
+    //showStatus(statusString);
     return IUP_DEFAULT;
 }
 
@@ -185,7 +192,8 @@ Module* modules[MODULE_CNT] = {
     &oodModule,
     &tamperModule,
     &resetModule,
-	&bandwidthModule,
+    &bandwidthModule,
+    &rateLimitModule,
 };
 
 volatile short sendState = SEND_STATUS_NONE;
@@ -627,6 +635,22 @@ static int uiTimerCb(Ihandle *ih) {
         IupSetAttribute(stateIcon, "IMAGE", "error_icon");
         InterlockedAnd16(&sendState, SEND_STATUS_NONE);
         break;
+    }
+
+    {
+        static int counter = 0; ++counter;
+        static float dataRateSmoothed = 0.0f;
+        static const float gain = 0.2f;
+        const float delta = rateLimit_dataRateBytesPerSec - dataRateSmoothed;
+        dataRateSmoothed += gain * delta;
+        if (dataRateSmoothed != dataRateSmoothed) dataRateSmoothed = rateLimit_dataRateBytesPerSec;
+        if (counter > 5)
+        {
+            char statusString[512];
+            sprintf(statusString, "data rate (Kbps)=%4i", (int)dataRateSmoothed / 128); // 1024/8=128
+            showStatus(statusString);
+            counter = 0;
+        }
     }
 
     return IUP_DEFAULT;

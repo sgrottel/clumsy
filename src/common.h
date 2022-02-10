@@ -8,8 +8,8 @@
 #define MSG_BUFSIZE 512
 #define FILTER_BUFSIZE 1024
 #define NAME_SIZE 16
-#define MODULE_CNT 8
-#define ICON_UPDATE_MS 50
+#define MODULE_CNT 9
+#define ICON_UPDATE_MS 100
 
 #define CONTROLS_HANDLE "__CONTROLS_HANDLE"
 #define SYNCED_VALUE "__SYNCED_VALUE"
@@ -146,6 +146,7 @@ extern Module dupModule;
 extern Module tamperModule;
 extern Module resetModule;
 extern Module bandwidthModule;
+extern Module rateLimitModule;
 extern Module* modules[MODULE_CNT]; // all modules in a list
 
 // status for sending packets, 
@@ -177,7 +178,7 @@ BOOL checkDirection(BOOL outboundPacket, short handleInbound, short handleOutbou
 
 
 // wraped timeBegin/EndPeriod to keep calling safe and end when exit
-#define TIMER_RESOLUTION 4
+#define TIMER_RESOLUTION 8
 void startTimePeriod();
 void endTimePeriod();
 
