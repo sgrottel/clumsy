@@ -108,6 +108,7 @@ extern Ihandle* chanceInput;
 extern Ihandle* bandwidthInput;
 extern Ihandle* rlDataRateCapMbps;
 extern float rateLimit_dataRateBytesPerSec;
+extern float rateLimit_queueDelayMs;
 
 static int zmqServerUpdate(Ihandle* ih)
 {   // Handle incoming ZeroMQ messages
@@ -123,7 +124,7 @@ static int zmqServerUpdate(Ihandle* ih)
         {   // ZMQ received a message.
             zmqMessage[numBytesRcvd] = '\0'; // nul-termimate zmqMessage
             sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK", counter, zmqMessage);
-            sprintf(zmqMessage, "DataRateKbps %i", (int)(rateLimit_dataRateBytesPerSec / 1024.0f));
+            sprintf(zmqMessage, "DataRateKbps %i   QueueDelayMs %i", (int)(rateLimit_dataRateBytesPerSec / 1024.0f), (int)rateLimit_queueDelayMs);
             zmq_send(zmqSocket, zmqMessage, strlen(zmqMessage), 0);
             int intParam = -1;
             float fltParam = -1.0f;
@@ -648,7 +649,7 @@ static int uiTimerCb(Ihandle *ih) {
         if (counter > 5)
         {
             char statusString[512];
-            sprintf(statusString, "data rate (Kbps)=%4i", (int)dataRateSmoothed / 128); // 1024/8=128
+            sprintf(statusString, "data rate (Kbps)=%4i    queue delay (ms)=%i", (int)dataRateSmoothed / 128 /* 1024/8=128 */, (int)rateLimit_queueDelayMs);
             showStatus(statusString);
             counter = 0;
         }

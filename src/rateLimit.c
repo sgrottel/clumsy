@@ -48,6 +48,7 @@ static int bufSize = 0;
 
 static DWORD prevTimeMs = 0;
 float rateLimit_dataRateBytesPerSec = 0.0f;
+float rateLimit_queueDelayMs = 0.0f;
 
 static CRateStats* rateStats = NULL;
 
@@ -177,6 +178,7 @@ static void rateLimitStartUp()
 
     prevTimeMs = timeGetTime();
     rateLimit_dataRateBytesPerSec = 0.0f;
+    rateLimit_queueDelayMs = 0.0f;
 
     //rbPopulation = 0;
     //rbHead = 0;
@@ -220,6 +222,8 @@ static short rateLimitProcess(PacketNode* head, PacketNode* tail)
         return 0;
     }
 
+    const float queueDelayUpdateGain = 0.0625f;
+
     //DWORD updateDurationMs = currentTimeMs - prevTimeMs;
     //int bytesSentThisUpdate = 0;
     PacketNode* pac = tail->prev;
@@ -249,6 +253,11 @@ static short rateLimitProcess(PacketNode* head, PacketNode* tail)
         if (waitedLongEnough && dataRateUnderCap)
         {
             PacketNode* node = insertAfter(popNode(bufTail->prev), head); // sending queue is already empty by now
+            {
+                const DWORD enqueueDurationMs = currentTimeMs - node->sendTimestamp;
+                const float delayDeltaMs = (float)enqueueDurationMs - rateLimit_queueDelayMs;
+                rateLimit_queueDelayMs += queueDelayUpdateGain * delayDeltaMs;
+            }
             //bytesSentThisUpdate += node->packetLen;
             crate_stats_update(rateStats, node->packetLen, currentTimeMs);
             //RbAppend(node->packetLen, currentTimeMs);
@@ -267,7 +276,12 @@ static short rateLimitProcess(PacketNode* head, PacketNode* tail)
         int flushCnt = FLUSH_WHEN_FULL;
         while (flushCnt-- > 0)
         {
-            /*PacketNode* node =*/ insertAfter(popNode(bufTail->prev), head);
+            PacketNode* node = insertAfter(popNode(bufTail->prev), head);
+            {
+                const DWORD enqueueDurationMs = currentTimeMs - node->sendTimestamp;
+                const float delayDeltaMs = (float)enqueueDurationMs - rateLimit_queueDelayMs;
+                rateLimit_queueDelayMs += queueDelayUpdateGain * delayDeltaMs;
+            }
             //bytesSentThisUpdate += node->packetLen;
             --bufSize;
         }
