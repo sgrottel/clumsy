@@ -9,7 +9,7 @@
 #define FILTER_BUFSIZE 1024
 #define NAME_SIZE 16
 #define MODULE_CNT 9
-#define ICON_UPDATE_MS 100
+#define ICON_UPDATE_MS 50
 
 #define CONTROLS_HANDLE "__CONTROLS_HANDLE"
 #define SYNCED_VALUE "__SYNCED_VALUE"
@@ -178,7 +178,7 @@ BOOL checkDirection(BOOL outboundPacket, short handleInbound, short handleOutbou
 
 
 // wraped timeBegin/EndPeriod to keep calling safe and end when exit
-#define TIMER_RESOLUTION 8
+#define TIMER_RESOLUTION 4
 void startTimePeriod();
 void endTimePeriod();
 

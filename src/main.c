@@ -171,7 +171,7 @@ static int zmqServerUpdate(Ihandle* ih)
             sprintf(statusString, "zmqServerUpdate: (tick %i) numBytesRcvd=%i ERROR errno=%i", counter, numBytesRcvd, errno);
         }
     } while (numBytesRcvd > 0);
-    showStatus(statusString);
+    //showStatus(statusString);
     return IUP_DEFAULT;
 }
 
