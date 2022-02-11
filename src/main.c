@@ -127,6 +127,7 @@ static int zmqServerUpdate(Ihandle* ih)
             {
                 char sendMessage[256];
                 sprintf(sendMessage, "DataRateKbps %i   QueueDelayMs %i", (int)(rateLimit_dataRateBytesPerSec / 1024.0f), (int)rateLimit_queueDelayMs);
+                showStatus(sendMessage);
                 zmq_send(zmqSocket, sendMessage, strlen(sendMessage), 0);
             }
             int intParam = -1;
@@ -642,6 +643,7 @@ static int uiTimerCb(Ihandle *ih) {
         break;
     }
 
+    if( * rateLimitModule.enabledFlag )
     {
         static int counter = 0; ++counter;
         static float dataRateSmoothed = 0.0f;

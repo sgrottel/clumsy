@@ -121,7 +121,7 @@ static short bandwidthProcess(PacketNode *head, PacketNode* tail) {
         if (checkDirection(pac->addr.Outbound, bandwidthInbound, bandwidthOutbound)) {
 			int rate = crate_stats_calculate(rateStats, now_ts);
 			int size = pac->packetLen;
-			if (rate + size > limit) {
+			if (rate /*+ size*/ > limit) {
 				LOG("dropped with bandwidth %dKB/s, direction %s",
 					(int)bandwidthLimit, pac->addr.Outbound ? "OUTBOUND" : "INBOUND");
 				discard = 1;
