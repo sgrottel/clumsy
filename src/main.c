@@ -77,7 +77,7 @@ static int zmqClientUpdate(Ihandle* ih)
         case 0: snprintf(sendMsg, sizeof(sendMsg), "LagDelayMs %i", counter % 500); break;
         case 1: snprintf(sendMsg, sizeof(sendMsg), "DropChancePct %i", counter % 100); break;
         case 2: snprintf(sendMsg, sizeof(sendMsg), "BandwidthLimitKBps %i", counter % 10000); break;
-        case 4: snprintf(sendMsg, sizeof(sendMsg), "RateLimitKbps %i", counter % 10000); break;
+        case 4: snprintf(sendMsg, sizeof(sendMsg), "RateLimitMbps %i", counter % 10000); break;
         default: snprintf(sendMsg, sizeof(sendMsg), "THIS_SHOULD_NEVER_HAPPEN %i", counter); break;
         }
         int numBytesSent = zmq_send(zmqSocket, sendMsg, strlen(sendMsg), 0);
@@ -87,7 +87,7 @@ static int zmqClientUpdate(Ihandle* ih)
             char receivedMessage[257];
             int numBytesRcvd = zmq_recv(zmqSocket, receivedMessage, sizeof(receivedMessage) - 1, 0);
             receivedMessage[numBytesRcvd] = '\0';
-            //LOG("zmqClientUpdate: (tick %i) sent=%i rcvd='%s'\n", counter, numBytesSent, zmqMessage);
+            //LOG("zmqClientUpdate: (tick %i) sent=%i rcvd='%s'\n", counter, numBytesSent, rcvdMessage);
             sprintf(statusString, "zmqClientUpdate: (tick %i) sendMsg='%s' numBytesSent=%i rcvdMsg='%s'", counter, sendMsg, numBytesSent, receivedMessage);
         }
         else if(EFSM == errno)
@@ -115,37 +115,40 @@ static int zmqServerUpdate(Ihandle* ih)
     UNREFERENCED_PARAMETER(ih);
     static int counter = 0; ++counter;
     //LOG("zmqServerUpdate: %i", counter);
-    char zmqMessage[256];
-    int numBytesRcvd = zmq_recv(zmqSocket, zmqMessage, sizeof(zmqMessage)-1, ZMQ_DONTWAIT);
+    char rcvdMessage[256];
+    int numBytesRcvd = zmq_recv(zmqSocket, rcvdMessage, sizeof(rcvdMessage)-1, ZMQ_DONTWAIT);
     char statusString[256];
     do
     {
         if (numBytesRcvd >= 0)
         {   // ZMQ received a message.
-            zmqMessage[numBytesRcvd] = '\0'; // nul-termimate zmqMessage
-            sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK", counter, zmqMessage);
-            sprintf(zmqMessage, "DataRateKbps %i   QueueDelayMs %i", (int)(rateLimit_dataRateBytesPerSec / 1024.0f), (int)rateLimit_queueDelayMs);
-            zmq_send(zmqSocket, zmqMessage, strlen(zmqMessage), 0);
+            rcvdMessage[numBytesRcvd] = '\0'; // nul-termimate rcvdMessage
+            sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK", counter, rcvdMessage);
+            {
+                char sendMessage[256];
+                sprintf(sendMessage, "DataRateKbps %i   QueueDelayMs %i", (int)(rateLimit_dataRateBytesPerSec / 1024.0f), (int)rateLimit_queueDelayMs);
+                zmq_send(zmqSocket, sendMessage, strlen(sendMessage), 0);
+            }
             int intParam = -1;
             float fltParam = -1.0f;
-            if (1 == sscanf(zmqMessage, "LagDelayMs %i", &intParam))
+            if (1 == sscanf(rcvdMessage, "LagDelayMs %i", &intParam))
             {   // Scanned "LagDelayMs" request
-                sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed LagDelayMs=%i", counter, zmqMessage, intParam);
+                sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed LagDelayMs=%i", counter, rcvdMessage, intParam);
                 IupSetInt(timeInput, "VALUE", intParam);
             }
-            else if (1 == sscanf(zmqMessage, "DropChancePct %f", &fltParam))
+            else if (1 == sscanf(rcvdMessage, "DropChancePct %f", &fltParam))
             {   // Scanned "DropChancePct" request
-                sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed DropChancePct=%f", counter, zmqMessage, fltParam);
+                sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed DropChancePct=%f", counter, rcvdMessage, fltParam);
                 IupSetFloat(chanceInput, "VALUE", fltParam);
             }
-            else if (1 == sscanf(zmqMessage, "BandwidthLimitKBps %i", &intParam))
+            else if (1 == sscanf(rcvdMessage, "BandwidthLimitKBps %i", &intParam))
             {   // Scanned "BandwidthLimitKBps" request
-                sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed BandwidthLimitKBps=%i", counter, zmqMessage, intParam);
+                sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed BandwidthLimitKBps=%i", counter, rcvdMessage, intParam);
                 IupSetInt(bandwidthInput, "VALUE", intParam);
             }
-            else if (1 == sscanf(zmqMessage, "RateLimitKbps %i", &intParam))
-            {   // Scanned "RateLimitKbps" request
-                sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed RateLimitKbps=%i", counter, zmqMessage, intParam);
+            else if (1 == sscanf(rcvdMessage, "RateLimitMbps %i", &intParam))
+            {   // Scanned "RateLimitMbps" request
+                sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed RateLimitMbps=%i", counter, rcvdMessage, intParam);
                 IupSetInt(rlDataRateCapMbps, "VALUE", intParam);
             }
             // See if ZMQ has another message to process right away.
@@ -153,7 +156,7 @@ static int zmqServerUpdate(Ihandle* ih)
             // because of how ZeroMQ does send/recv in pairs when in REQ-REP mode,
             // the presence now of another message implies the client got the ACK and responded very fast
             // -- not that the client queued up multiple messages before the zmq_recv above.
-            numBytesRcvd = zmq_recv(zmqSocket, zmqMessage, sizeof(zmqMessage) - 1, ZMQ_DONTWAIT);
+            numBytesRcvd = zmq_recv(zmqSocket, rcvdMessage, sizeof(rcvdMessage) - 1, ZMQ_DONTWAIT);
         }
         else if (EAGAIN == errno)
         {   // ZMQ received nothing.
@@ -168,7 +171,7 @@ static int zmqServerUpdate(Ihandle* ih)
             sprintf(statusString, "zmqServerUpdate: (tick %i) numBytesRcvd=%i ERROR errno=%i", counter, numBytesRcvd, errno);
         }
     } while (numBytesRcvd > 0);
-    //showStatus(statusString);
+    showStatus(statusString);
     return IUP_DEFAULT;
 }
 
