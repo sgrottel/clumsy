@@ -117,6 +117,8 @@ int uiSyncInteger(Ihandle *ih);
 int uiSyncFixed(Ihandle *ih);
 int uiSyncInt32(Ihandle *ih);
 
+extern void IupResyncShortValueFromUi(Ihandle* control, volatile short * var);
+
 
 // module
 typedef struct {

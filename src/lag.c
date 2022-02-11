@@ -49,12 +49,14 @@ static Ihandle *lagSetupUI() {
     IupSetAttribute(timeInput, SYNCED_VALUE, (char*)&lagTime);
     IupSetAttribute(timeInput, INTEGER_MAX, LAG_MAX);
     IupSetAttribute(timeInput, INTEGER_MIN, LAG_MIN);
+
     IupSetAttribute(variationInput, "VISIBLECOLUMNS", "4");
     IupSetAttribute(variationInput, "VALUE", STR(VARIATION_DEFAULT));
     IupSetCallback(variationInput, "VALUECHANGED_CB", uiSyncInteger);
     IupSetAttribute(variationInput, SYNCED_VALUE, (char*)&lagVariation);
     IupSetAttribute(variationInput, INTEGER_MAX, VARIATION_MAX);
     IupSetAttribute(variationInput, INTEGER_MIN, VARIATION_MIN);
+
     IupSetCallback(inboundCheckbox, "ACTION", (Icallback)uiSyncToggle);
     IupSetAttribute(inboundCheckbox, SYNCED_VALUE, (char*)&lagInbound);
     IupSetCallback(outboundCheckbox, "ACTION", (Icallback)uiSyncToggle);
@@ -99,6 +101,10 @@ static void lagCloseDown(PacketNode *head, PacketNode *tail) {
 
 static short lagProcess(PacketNode *head, PacketNode *tail) {
     DWORD currentTime = timeGetTime();
+
+    IupResyncShortValueFromUi(timeInput, & lagTime);
+    IupResyncShortValueFromUi(variationInput, & lagVariation);
+
     PacketNode *pac = tail->prev;
     // pick up all packets and fill in the current time
     while (bufSize < KEEP_AT_MOST && pac != head) {

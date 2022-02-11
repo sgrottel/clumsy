@@ -125,9 +125,9 @@ static int zmqServerUpdate(Ihandle* ih)
             rcvdMessage[numBytesRcvd] = '\0'; // nul-termimate rcvdMessage
             sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK", counter, rcvdMessage);
             {
-                char sendMessage[256];
-                sprintf(sendMessage, "DataRateKbps %i   QueueDelayMs %i", (int)(rateLimit_dataRateBytesPerSec / 1024.0f), (int)rateLimit_queueDelayMs);
-                showStatus(sendMessage);
+                char sendMessage[512];
+                sprintf(sendMessage, "DataRateKbps %i   QueueDelayMs %i", (int)(rateLimit_dataRateBytesPerSec / 128.0f), (int)rateLimit_queueDelayMs);
+                //showStatus(sendMessage);
                 zmq_send(zmqSocket, sendMessage, strlen(sendMessage), 0);
             }
             int intParam = -1;
@@ -654,7 +654,7 @@ static int uiTimerCb(Ihandle *ih) {
         if (counter > 5)
         {
             char statusString[512];
-            sprintf(statusString, "data rate (Kbps)=%4i    queue delay (ms)=%i", (int)dataRateSmoothed / 128 /* 1024/8=128 */, (int)rateLimit_queueDelayMs);
+            sprintf(statusString, "data rate (Kbps)=%4i    queue delay (ms)=%i", (int)( dataRateSmoothed / 128.0f /*1024/8=128*/), (int)rateLimit_queueDelayMs);
             showStatus(statusString);
             counter = 0;
         }

@@ -107,6 +107,9 @@ static void bandwidthCloseDown(PacketNode *head, PacketNode *tail) {
 static short bandwidthProcess(PacketNode *head, PacketNode* tail) {
     int dropped = 0;
 	DWORD now_ts = timeGetTime();
+
+	// TODO: IupResyncLongValueFromUi(bandwidthInput, & bandwidthLimit);
+
 	int limit = bandwidthLimit * 1024;
 
 	//	allow 0 limit which should drop all

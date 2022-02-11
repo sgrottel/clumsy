@@ -129,6 +129,18 @@ int uiSyncFixed(Ihandle *ih) {
     return IUP_DEFAULT;
 }
 
+// Assign data-behind variable to UI setting.
+// Apparently Iup does not actually update the "synced variable" when IupSetInt is used to assign the value in the control.
+// So call this routine periodically to ensure that if IupSetInt was called, the "synced variable" actually gets assigned to that value.
+void IupResyncShortValueFromUi(Ihandle* control, volatile short * var)
+{
+    const int valFromUi = IupGetInt(control, "VALUE");
+    if (*var != valFromUi)
+    {
+        *var = (short)valFromUi;
+    }
+}
+
 
 // indicator icon, generated from scripts/im2carr.py
 const unsigned char icon8x8[8*8] = {

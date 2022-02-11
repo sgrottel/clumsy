@@ -19,9 +19,9 @@
 #define LAG_MAX "15000"
 #define VARIATION_MIN "0"
 #define VARIATION_MAX "15000"
-#define KEEP_AT_MOST 2000
+#define KEEP_AT_MOST 100
 // send FLUSH_WHEN_FULL packets when buffer is full
-#define FLUSH_WHEN_FULL 800
+#define FLUSH_WHEN_FULL 0
 #define LAG_DEFAULT 0
 #define VARIATION_DEFAULT 0
 
@@ -217,6 +217,8 @@ static void rateLimitCloseDown(PacketNode *head, PacketNode *tail)
 static short rateLimitProcess(PacketNode* head, PacketNode* tail)
 {
     const DWORD currentTimeMs = timeGetTime();
+
+    IupResyncShortValueFromUi(rlDataRateCapMbps, & dataRateCapMbps);
 
     if (rateStats == NULL) {
         return 0;
