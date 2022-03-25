@@ -5,7 +5,7 @@
 #include <Windows.h>
 #include "iup.h"
 #include "common.h"
-
+#include "tracing.h"
 
 
 
@@ -136,21 +136,25 @@ static int zmqServerUpdate(Ihandle* ih)
             {   // Scanned "LagDelayMs" request
                 sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed LagDelayMs=%i", counter, rcvdMessage, intParam);
                 IupSetInt(timeInput, "VALUE", intParam);
+                IupTriggerValueChangedCallback(timeInput);
             }
             else if (1 == sscanf(rcvdMessage, "DropChancePct %f", &fltParam))
             {   // Scanned "DropChancePct" request
                 sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed DropChancePct=%f", counter, rcvdMessage, fltParam);
                 IupSetFloat(chanceInput, "VALUE", fltParam);
+                IupTriggerValueChangedCallback(chanceInput);
             }
             else if (1 == sscanf(rcvdMessage, "BandwidthLimitKBps %i", &intParam))
             {   // Scanned "BandwidthLimitKBps" request
                 sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed BandwidthLimitKBps=%i", counter, rcvdMessage, intParam);
                 IupSetInt(bandwidthInput, "VALUE", intParam);
+                IupTriggerValueChangedCallback(bandwidthInput);
             }
             else if (1 == sscanf(rcvdMessage, "RateLimitMbps %i", &intParam))
             {   // Scanned "RateLimitMbps" request
                 sprintf(statusString, "zmqServerUpdate: (tick %i) receivedMessage='%s' sending ACK parsed RateLimitMbps=%i", counter, rcvdMessage, intParam);
                 IupSetInt(rlDataRateCapMbps, "VALUE", intParam);
+                IupTriggerValueChangedCallback(rlDataRateCapMbps);
             }
             // See if ZMQ has another message to process right away.
             // Note that if only 1 client is connected,
@@ -561,6 +565,12 @@ static int uiStartCb(Ihandle *ih) {
     }
 #endif
 
+    tracingWriteEnabledEvent(
+        TRUE,
+        modules,
+        MODULE_CNT
+    );
+
     // successfully started
     showStatus("Started filtering. Enable functionalities to take effect.");
     IupSetAttribute(filterText, "ACTIVE", "NO");
@@ -574,6 +584,12 @@ static int uiStartCb(Ihandle *ih) {
 static int uiStopCb(Ihandle *ih) {
     int ix;
     UNREFERENCED_PARAMETER(ih);
+
+    tracingWriteEnabledEvent(
+        FALSE,
+        modules,
+        MODULE_CNT
+    );
     
     // try stopping
     IupSetAttribute(filterButton, "ACTIVE", "NO");
@@ -602,12 +618,26 @@ static int uiToggleControls(Ihandle *ih, int state) {
     Ihandle *controls = (Ihandle*)IupGetAttribute(ih, CONTROLS_HANDLE);
     short *target = (short*)IupGetAttribute(ih, SYNCED_VALUE);
     int controlsActive = IupGetInt(controls, "ACTIVE");
+    int running = memcmp("YES", IupGetAttribute(timer, "RUN"), 3) == 0;
+
     if (controlsActive && !state) {
         IupSetAttribute(controls, "ACTIVE", "NO");
         InterlockedExchange16(target, I2S(state));
+        tracingWriteEnabledEvent(
+            running,
+            modules,
+            MODULE_CNT
+        );
+
     } else if (!controlsActive && state) {
         IupSetAttribute(controls, "ACTIVE", "YES");
         InterlockedExchange16(target, I2S(state));
+        tracingWriteEnabledEvent(
+            running,
+            modules,
+            MODULE_CNT
+        );
+
     }
 
     return IUP_DEFAULT;
@@ -719,8 +749,10 @@ static void uiSetupModule(Module *module, Ihandle *parent) {
 int main(int argc, char* argv[]) {
     LOG("Is Run As Admin: %d", IsRunAsAdmin());
     LOG("Is Elevated: %d", IsElevated());
+    tracingSetup();
     init(argc, argv);
     startup();
     cleanup();
+    tracingTeardown();
     return 0;
 }

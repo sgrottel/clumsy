@@ -197,3 +197,6 @@ extern BOOL parameterized;
 void setFromParameter(Ihandle *ih, const char *field, const char *key);
 BOOL parseArgs(int argc, char* argv[]);
 
+// When setting a control's value programmatically the `VALUECHANGED_CB` is not invoked.
+// Use this helper function to tigger it now synchrously.
+void IupTriggerValueChangedCallback(Ihandle* ih);

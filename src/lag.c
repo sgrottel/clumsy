@@ -1,6 +1,7 @@
 // lagging packets
 #include "iup.h"
 #include "common.h"
+#include "tracing.h"
 #define NAME "lag"
 #define LAG_MIN "0"
 #define LAG_MAX "15000"
@@ -30,6 +31,12 @@ static INLINE_FUNCTION short isBufEmpty() {
     short ret = bufHead->next == bufTail;
     if (ret) assert(bufSize == 0);
     return ret;
+}
+
+static int traceLagParams(Ihandle* ih) {
+    UNREFERENCED_PARAMETER(ih);
+    tracingWriteEventLagSettings(lagInbound, lagOutbound, lagTime, lagVariation);
+    return IUP_DEFAULT;
 }
 
 static Ihandle *lagSetupUI() {
@@ -65,6 +72,11 @@ static Ihandle *lagSetupUI() {
     // enable by default to avoid confusing
     IupSetAttribute(inboundCheckbox, "VALUE", "ON");
     IupSetAttribute(outboundCheckbox, "VALUE", "ON");
+
+    IupInstallCallbackChain(timeInput, &traceLagParams);
+    IupInstallCallbackChain(variationInput, &traceLagParams);
+    IupInstallCallbackChain(inboundCheckbox, &traceLagParams);
+    IupInstallCallbackChain(outboundCheckbox, &traceLagParams);
 
     if (parameterized) {
         setFromParameter(inboundCheckbox, "VALUE", NAME"-inbound");
