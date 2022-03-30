@@ -208,3 +208,10 @@ BOOL parseArgs(int argc, char* argv[]) {
 
     return 1;
 }
+
+void IupTriggerValueChangedCallback(Ihandle* ih) {
+    Icallback cb = IupGetCallback(ih, "VALUECHANGED_CB");
+    if (cb) {
+        cb(ih);
+    }
+}

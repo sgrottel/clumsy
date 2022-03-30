@@ -12,6 +12,7 @@
 // rate-limit packets
 #include "iup.h"
 #include "common.h"
+#include "tracing.h"
 #include "rateStats.h"
 
 #define NAME "rateLimit"
@@ -101,6 +102,18 @@ static CRateStats* rateStats = NULL;
 //}
 ///////////////////////////////////////////////////////////////////////////////////////////
 
+static int traceRateLimitParams(Ihandle* ih) {
+    UNREFERENCED_PARAMETER(ih);
+    tracingWriteEventRateLimitSettings(
+        rateLimitInbound,
+        rateLimitOutbound,
+        rlLagTime,
+        rlLagVariation,
+        dataRateCapMbps
+    );
+    return IUP_DEFAULT;
+}
+
 static INLINE_FUNCTION short isBufEmpty()
 {
     short ret = bufHead->next == bufTail;
@@ -149,6 +162,12 @@ static Ihandle *rateLimitSetupUI()
     // enable by default to avoid confusing
     IupSetAttribute(inboundCheckbox, "VALUE", "ON");
     IupSetAttribute(outboundCheckbox, "VALUE", "ON");
+
+    IupInstallCallbackChain(inboundCheckbox, &traceRateLimitParams);
+    IupInstallCallbackChain(outboundCheckbox, &traceRateLimitParams);
+    IupInstallCallbackChain(rlTimeInput, &traceRateLimitParams);
+    IupInstallCallbackChain(rlVariationInput, &traceRateLimitParams);
+    IupInstallCallbackChain(rlDataRateCapMbps, &traceRateLimitParams);
 
     if (parameterized)
     {
