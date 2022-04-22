@@ -249,14 +249,21 @@ static short rateLimitProcess(PacketNode* head, PacketNode* tail)
     //int bytesSentThisUpdate = 0;
     PacketNode* pac = tail->prev;
     // pick up all packets and fill in the current time
-    while (bufSize < KEEP_AT_MOST && pac != head)
-    {
+    while (pac != head)
+    {   // There are packets to process
         if (checkDirection(pac->addr.Outbound, rateLimitInbound, rateLimitOutbound))
-        {
+        {   // Packets are heading in a direction that this module is processing
             // lag varies from rlLagTime - rlLagVariation <= lag <= rlLagTime + rlLagVariation
             short lag = rlLagTime + (rand() % (1 + 2 * rlLagVariation)) - rlLagVariation;
-            insertAfter(popNode(pac), bufHead)->sendTimestamp = currentTimeMs + lag;
-            ++bufSize;
+            if (bufSize < KEEP_AT_MOST)
+            {   // lag buffer has room
+                insertAfter(popNode(pac), bufHead)->sendTimestamp = currentTimeMs + lag; // transfer packet into lag buffer with updated send timestamp
+                ++bufSize;
+            }
+            else
+            {
+                popNode(pac); // discard packet
+            }
             pac = tail->prev;
         }
         else {
