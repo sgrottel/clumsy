@@ -618,7 +618,7 @@ static int uiToggleControls(Ihandle *ih, int state) {
     Ihandle *controls = (Ihandle*)IupGetAttribute(ih, CONTROLS_HANDLE);
     short *target = (short*)IupGetAttribute(ih, SYNCED_VALUE);
     int controlsActive = IupGetInt(controls, "ACTIVE");
-    int running = memcmp("YES", IupGetAttribute(timer, "RUN"), 3) == 0;
+    int running = (timer != NULL) ? (memcmp("YES", IupGetAttribute(timer, "RUN"), 3) == 0) : 0;
 
     if (controlsActive && !state) {
         IupSetAttribute(controls, "ACTIVE", "NO");
