@@ -746,7 +746,29 @@ static void uiSetupModule(Module *module, Ihandle *parent) {
     }
 }
 
+int zmqSendCommand(int argc, char* argv[]) {
+    if (argc > 2) {
+        size_t s = strlen(argv[1]);
+        if (s > 10) s = 10;
+        if (memcmp(argv[1], "--sendcmd", s) == 0) {
+
+            void* context = zmq_ctx_new();
+            void* requester = zmq_socket(context, ZMQ_REQ);
+            zmq_connect(requester, "tcp://localhost:5555");
+            zmq_send(requester, "LagDelayMs 10", 14, 0);
+            zmq_close(requester);
+            zmq_ctx_destroy(context);
+
+            return 1;
+        }
+    }
+    return 0;
+}
+
 int main(int argc, char* argv[]) {
+    if (zmqSendCommand(argc, argv)) {
+        return 0;
+    }
     LOG("Is Run As Admin: %d", IsRunAsAdmin());
     LOG("Is Elevated: %d", IsElevated());
     tracingSetup();
