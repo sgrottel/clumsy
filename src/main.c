@@ -18,6 +18,8 @@
 // For development of ZMQ-specific features, set ZMQ_NO_FILTER to 1 for both client and server. This disables clumsy filters and WinDivert operations.
 #define ZMQ_NO_FILTER 0
 
+#define ZMQ_PORT_STR "5689"
+
 void * zmqContext = 0;
 void * zmqSocket = 0;
 
@@ -33,7 +35,7 @@ static int zmqConnect(void)
     LOG("zmqConnect: ");
     // Create socket to talk to server
     zmqSocket = zmq_socket(zmqContext, ZMQ_REQ);
-    int rc = zmq_connect(zmqSocket, "tcp://localhost:5555");
+    int rc = zmq_connect(zmqSocket, "tcp://localhost:"ZMQ_PORT_STR);
     LOG("zmq_connect=%i\n", rc);
     return rc;
 }
@@ -43,7 +45,7 @@ static int zmqListen(void)
     LOG("zmqListen: ");
     // Create socket to talk to clients
     zmqSocket = zmq_socket(zmqContext, ZMQ_REP);
-    int rc = zmq_bind(zmqSocket, "tcp://*:5555");
+    int rc = zmq_bind(zmqSocket, "tcp://*:"ZMQ_PORT_STR);
     LOG("zmq_bind=%i\n", rc);
     return rc;
 }
@@ -752,13 +754,35 @@ int zmqSendCommand(int argc, char* argv[]) {
         if (s > 10) s = 10;
         if (memcmp(argv[1], "--sendcmd", s) == 0) {
 
+            s = 0;
+            for (int argi = 2; argi < argc; ++argi) {
+                s += 1 + strlen(argv[argi]);
+            }
+
+            char* msg = (char*)malloc(s);
+            if (msg == 0) {
+                LOG("Malloc null");
+                return 1;
+            }
+
+            s = 0;
+            for (int argi = 2; argi < argc; ++argi) {
+                size_t l = strlen(argv[argi]);
+                memcpy(msg + s, argv[argi], l);
+                s += l;
+                msg[s] = ' ';
+                s++;
+            }
+            msg[s - 1] = 0;
+
             void* context = zmq_ctx_new();
             void* requester = zmq_socket(context, ZMQ_REQ);
-            zmq_connect(requester, "tcp://localhost:5555");
-            zmq_send(requester, "LagDelayMs 10", 14, 0);
+            zmq_connect(requester, "tcp://localhost:"ZMQ_PORT_STR);
+            zmq_send(requester, msg, s, 0);
             zmq_close(requester);
             zmq_ctx_destroy(context);
 
+            free(msg);
             return 1;
         }
     }
